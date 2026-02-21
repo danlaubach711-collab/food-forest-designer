@@ -7,16 +7,13 @@
 <!-- Google Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
 
-<!-- Leaflet core, Draw, and Geocoder -->
+<!-- Leaflet CSS, Draw & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
-
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
-<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
 
-<!-- Utilities -->
+<!-- Helpers -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
@@ -69,11 +66,10 @@ button:hover {
   flex:1;
   position:relative;
 }
-
 #instructions {
   position:absolute;
-  top:85px;
-  left:10px;
+  bottom:20px;
+  left:20px;
   background:#ffffffd9;
   padding:12px;
   border-radius:6px;
@@ -86,13 +82,13 @@ button:hover {
 }
 #instructions.hidden {
   opacity:0;
-  transform:translateX(-280px);
+  transform:translateY(200px);
   pointer-events:none;
 }
 #toggleInstructions {
   position:absolute;
-  top:85px;
-  left:10px;
+  bottom:20px;
+  left:20px;
   background:#4a7c59;
   color:white;
   border:none;
@@ -106,8 +102,7 @@ button:hover {
 @media(max-width:768px){
   header {font-size:22px;}
   .controls{flex-direction:column;}
-  #instructions{position:static;max-width:100%;box-shadow:none;}
-  #toggleInstructions{position:fixed;bottom:15px;left:15px;}
+  #instructions{max-width:90%;left:5%;}
 }
 </style>
 </head>
@@ -131,22 +126,22 @@ button:hover {
   <div id="instructions">
     <strong>🌱 How to Use:</strong><br><br>
     1️⃣ Enter your address and click <b>Find Location</b><br>
-    2️⃣ Use the polygon ✳️ tool (top left) to draw your planting area<br>
-    3️⃣ Click <b>Generate Forest Plan</b> 🌳 to visualize recommendations<br>
-    4️⃣ Export your design with <b>Download PDF</b> 📄<br><br>
-    💡 Tip: Zoom in close to plan around your property!
+    2️⃣ Use the polygon ✳️ tool (upper-left map icons) to draw your planting area<br>
+    3️⃣ Click <b>Generate Forest Plan</b> 🌳 to visualize recommended plants<br>
+    4️⃣ Use <b>Download PDF</b> 📄 to export<br><br>
+    💡 Tip: Zoom in for precise planning!
   </div>
   <button id="toggleInstructions">📘 Help</button>
 </div>
 
 <script>
-// Toggle instructions
+// --- TOGGLE HELP BOX (moved to lower-left) ---
 const instructions=document.getElementById("instructions");
 const toggleBtn=document.getElementById("toggleInstructions");
-let open=true;
+let helpOpen=true;
 toggleBtn.addEventListener("click",()=>{
-  open=!open;
-  if(open){
+  helpOpen=!helpOpen;
+  if(helpOpen){
     instructions.classList.remove("hidden");
     toggleBtn.innerText="❌ Close Help";
   } else {
@@ -155,7 +150,7 @@ toggleBtn.addEventListener("click",()=>{
   }
 });
 
-// Initialize map with SATELLITE imagery
+// --- MAP INITIALIZATION with SATELLITE VIEW ---
 const map=L.map('map').setView([40.0379,-76.3055],13);
 L.tileLayer(
   'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
@@ -165,55 +160,55 @@ L.tileLayer(
   }
 ).addTo(map);
 
-// Geocoder
-const geocoder=L.Control.geocoder({defaultMarkGeocode:false})
-.on('markgeocode',function(e){
-  const latlng=e.geocode.center;
-  map.setView(latlng,18);
-  if(window.addressMarker) map.removeLayer(window.addressMarker);
-  window.addressMarker=L.marker(latlng).addTo(map)
-    .bindPopup(e.geocode.name)
-    .openPopup();
-})
-.addTo(map);
-
-document.getElementById("findBtn").addEventListener("click",()=>{
+// --- SAFE HTTPS GEOCODER ---
+async function geocodeAddress(){
   const addr=document.getElementById("address").value.trim();
   if(!addr){alert("Please enter an address.");return;}
-  geocoder.options.geocoder.geocode(addr,results=>{
-    if(!results.length){alert("Address not found.");return;}
-    const r=results[0];
-    map.setView(r.center,18);
-    if(window.addressMarker) map.removeLayer(window.addressMarker);
-    window.addressMarker=L.marker(r.center).addTo(map)
-      .bindPopup(r.name)
-      .openPopup();
-  });
-});
 
-// Draw tools
+  const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`;
+  try{
+    const res=await fetch(url,{headers:{"Accept-Language":"en"}});
+    const data=await res.json();
+    if(!data.length){alert("Address not found.");return;}
+
+    const lat=parseFloat(data[0].lat);
+    const lon=parseFloat(data[0].lon);
+    map.setView([lat,lon],18);
+
+    if(window.addressMarker) map.removeLayer(window.addressMarker);
+    window.addressMarker=L.marker([lat,lon]).addTo(map)
+      .bindPopup(data[0].display_name)
+      .openPopup();
+  }catch(e){
+    console.error(e);
+    alert("Lookup failed. Please try again later.");
+  }
+}
+document.getElementById("findBtn").addEventListener("click",geocodeAddress);
+
+// --- DRAW TOOLS ---
 const drawnItems=new L.FeatureGroup();
 map.addLayer(drawnItems);
 map.addControl(new L.Control.Draw({
   edit:{featureGroup:drawnItems},
-  draw:{polygon:true,rectangle:false,marker:false,polyline:false,circle:false}
+  draw:{polygon:true,rectangle:false,polyline:false,circle:false,marker:false}
 }));
 
 let plantingPolygon=null;
+let polygonArea=0;
 let forestLayer=L.layerGroup().addTo(map);
 let currentPlan=[];
-let polygonArea=0;
 
-map.on(L.Draw.Event.CREATED,event=>{
+map.on(L.Draw.Event.CREATED,function(e){
   drawnItems.clearLayers();
-  plantingPolygon=event.layer;
+  plantingPolygon=e.layer;
   drawnItems.addLayer(plantingPolygon);
   const geojson=plantingPolygon.toGeoJSON();
-  polygonArea=turf.area(geojson)*10.7639;
+  polygonArea=turf.area(geojson)*10.7639; // m2→ft2
   alert("Area selected: "+Math.round(polygonArea)+" sq ft");
 });
 
-// Plants data
+// --- PLANT DATA ---
 const plants=[
 {name:"Pecan",width:40,layer:"canopy"},
 {name:"Persimmon",width:20,layer:"canopy"},
@@ -226,20 +221,23 @@ const plants=[
 {name:"Comfrey",width:3,layer:"herb"}
 ];
 
+// --- FOREST GENERATION ---
 function generateForest(){
   if(!plantingPolygon){alert("Draw your planting area first.");return;}
-  forestLayer.clearLayers();
-  currentPlan=[];
+  forestLayer.clearLayers(); currentPlan=[];
+
   const goal=document.getElementById("goal").value;
   const b=plantingPolygon.getBounds();
   const north=b.getNorth(),south=b.getSouth(),west=b.getWest(),east=b.getEast();
   const colors={canopy:"#206a3b",understory:"#379956",shrub:"#5dc273",berry:"#97e8a4",herb:"#e5d768"};
+
   let filtered=plants;
   if(goal==="fruit") filtered=plants.filter(p=>["berry","shrub","understory"].includes(p.layer));
   else if(goal==="low") filtered=plants.filter(p=>["canopy","shrub"].includes(p.layer));
+
   filtered.forEach(p=>{
-    let qty=Math.max(1,Math.floor(polygonArea/(p.width*p.width*6)));
-    currentPlan.push({name:p.name,qty:qty});
+    const qty=Math.max(1,Math.floor(polygonArea/(p.width*p.width*6)));
+    currentPlan.push({name:p.name,qty});
     for(let i=0;i<qty;i++){
       const randLat=south+Math.random()*(north-south);
       const randLng=west+Math.random()*(east-west);
@@ -250,18 +248,19 @@ function generateForest(){
       }).addTo(forestLayer);
     }
   });
-  alert("🌳 Forest plan generated on the map!");
+  alert("🌳 Forest plan generated! See the map for layout.");
 }
 
+// --- PDF EXPORT ---
 async function downloadPDF(){
   if(currentPlan.length===0){alert("Generate a forest plan first.");return;}
   const canvas=await html2canvas(document.getElementById("map"));
-  const imgData=canvas.toDataURL("image/png");
+  const img=canvas.toDataURL("image/png");
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF();
   doc.setFontSize(18);
   doc.text("Lancaster Food Forest Plan",15,20);
-  doc.addImage(imgData,"PNG",15,30,180,100);
+  doc.addImage(img,"PNG",15,30,180,100);
   doc.setFontSize(12);
   let y=140;
   currentPlan.forEach(p=>{
