@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Lancaster Food Forest Designer</title>
+
+<!-- Google Fonts -->
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
+
+<!-- Leaflet core, Draw, and Geocoder -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.css"/>
+
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
+<script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
+
+<!-- Utilities -->
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+body {
+  margin:0;
+  font-family:'Open Sans',sans-serif;
+  background:#f4fff4;
+  color:#1d2b1f;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+header {
+  background:#b9e3b5;
+  padding:15px;
+  text-align:center;
+  font-family:'Poppins',sans-serif;
+  font-weight:600;
+  font-size:26px;
+  box-shadow:0 2px 4px rgba(0,0,0,0.1);
+}
+.controls {
+  background:#e6f4e6;
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  padding:10px;
+}
+input, select, button {
+  padding:8px 12px;
+  border-radius:6px;
+  border:1px solid #c2d8c2;
+  font-family:'Open Sans',sans-serif;
+}
+button {
+  background:#4a7c59;
+  color:white;
+  border:none;
+  cursor:pointer;
+  transition:background 0.2s;
+}
+button:hover {
+  background:#64a36e;
+}
+#map {
+  flex:1;
+  position:relative;
+}
+
+#instructions {
+  position:absolute;
+  top:85px;
+  left:10px;
+  background:#ffffffd9;
+  padding:12px;
+  border-radius:6px;
+  max-width:260px;
+  box-shadow:0 2px 10px rgba(0,0,0,0.2);
+  font-size:14px;
+  line-height:1.4;
+  transition:all 0.3s ease;
+  z-index:1000;
+}
+#instructions.hidden {
+  opacity:0;
+  transform:translateX(-280px);
+  pointer-events:none;
+}
+#toggleInstructions {
+  position:absolute;
+  top:85px;
+  left:10px;
+  background:#4a7c59;
+  color:white;
+  border:none;
+  padding:8px 12px;
+  border-radius:6px;
+  font-family:'Poppins',sans-serif;
+  font-weight:500;
+  cursor:pointer;
+  z-index:1100;
+}
+@media(max-width:768px){
+  header {font-size:22px;}
+  .controls{flex-direction:column;}
+  #instructions{position:static;max-width:100%;box-shadow:none;}
+  #toggleInstructions{position:fixed;bottom:15px;left:15px;}
+}
+</style>
+</head>
+
+<body>
+<header>🌿 Lancaster Food Forest Designer</header>
+
+<div class="controls">
+  <input type="text" id="address" placeholder="Enter your address">
+  <button id="findBtn">Find Location</button>
+  <select id="goal">
+    <option value="balanced">Balanced Forest</option>
+    <option value="fruit">Fruit-Focused</option>
+    <option value="low">Low-Maintenance</option>
+  </select>
+  <button onclick="generateForest()">Generate Forest Plan</button>
+  <button onclick="downloadPDF()">Download PDF</button>
+</div>
+
+<div id="map">
+  <div id="instructions">
+    <strong>🌱 How to Use:</strong><br><br>
+    1️⃣ Enter your address and click <b>Find Location</b><br>
+    2️⃣ Use the polygon ✳️ tool (top left) to draw your planting area<br>
+    3️⃣ Click <b>Generate Forest Plan</b> 🌳 to visualize recommendations<br>
+    4️⃣ Export your design with <b>Download PDF</b> 📄<br><br>
+    💡 Tip: Zoom in close to plan around your property!
+  </div>
+  <button id="toggleInstructions">📘 Help</button>
+</div>
+
+<script>
+// Toggle instructions
+const instructions=document.getElementById("instructions");
+const toggleBtn=document.getElementById("toggleInstructions");
+let open=true;
+toggleBtn.addEventListener("click",()=>{
+  open=!open;
+  if(open){
+    instructions.classList.remove("hidden");
+    toggleBtn.innerText="❌ Close Help";
+  } else {
+    instructions.classList.add("hidden");
+    toggleBtn.innerText="📘 Help";
+  }
+});
+
+// Initialize map with SATELLITE imagery
+const map=L.map('map').setView([40.0379,-76.3055],13);
+L.tileLayer(
+  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  {
+    attribution:'Tiles © Esri | Sources: Esri, USGS, NOAA',
+    maxZoom:19
+  }
+).addTo(map);
+
+// Geocoder
+const geocoder=L.Control.geocoder({defaultMarkGeocode:false})
+.on('markgeocode',function(e){
+  const latlng=e.geocode.center;
+  map.setView(latlng,18);
+  if(window.addressMarker) map.removeLayer(window.addressMarker);
+  window.addressMarker=L.marker(latlng).addTo(map)
+    .bindPopup(e.geocode.name)
+    .openPopup();
+})
+.addTo(map);
+
+document.getElementById("findBtn").addEventListener("click",()=>{
+  const addr=document.getElementById("address").value.trim();
+  if(!addr){alert("Please enter an address.");return;}
+  geocoder.options.geocoder.geocode(addr,results=>{
+    if(!results.length){alert("Address not found.");return;}
+    const r=results[0];
+    map.setView(r.center,18);
+    if(window.addressMarker) map.removeLayer(window.addressMarker);
+    window.addressMarker=L.marker(r.center).addTo(map)
+      .bindPopup(r.name)
+      .openPopup();
+  });
+});
+
+// Draw tools
+const drawnItems=new L.FeatureGroup();
+map.addLayer(drawnItems);
+map.addControl(new L.Control.Draw({
+  edit:{featureGroup:drawnItems},
+  draw:{polygon:true,rectangle:false,marker:false,polyline:false,circle:false}
+}));
+
+let plantingPolygon=null;
+let forestLayer=L.layerGroup().addTo(map);
+let currentPlan=[];
+let polygonArea=0;
+
+map.on(L.Draw.Event.CREATED,event=>{
+  drawnItems.clearLayers();
+  plantingPolygon=event.layer;
+  drawnItems.addLayer(plantingPolygon);
+  const geojson=plantingPolygon.toGeoJSON();
+  polygonArea=turf.area(geojson)*10.7639;
+  alert("Area selected: "+Math.round(polygonArea)+" sq ft");
+});
+
+// Plants data
+const plants=[
+{name:"Pecan",width:40,layer:"canopy"},
+{name:"Persimmon",width:20,layer:"canopy"},
+{name:"Pawpaw",width:15,layer:"understory"},
+{name:"Hazelnut",width:10,layer:"shrub"},
+{name:"Elderberry",width:10,layer:"shrub"},
+{name:"Blueberry",width:4,layer:"berry"},
+{name:"Raspberry",width:3,layer:"berry"},
+{name:"Blackberry",width:3,layer:"berry"},
+{name:"Comfrey",width:3,layer:"herb"}
+];
+
+function generateForest(){
+  if(!plantingPolygon){alert("Draw your planting area first.");return;}
+  forestLayer.clearLayers();
+  currentPlan=[];
+  const goal=document.getElementById("goal").value;
+  const b=plantingPolygon.getBounds();
+  const north=b.getNorth(),south=b.getSouth(),west=b.getWest(),east=b.getEast();
+  const colors={canopy:"#206a3b",understory:"#379956",shrub:"#5dc273",berry:"#97e8a4",herb:"#e5d768"};
+  let filtered=plants;
+  if(goal==="fruit") filtered=plants.filter(p=>["berry","shrub","understory"].includes(p.layer));
+  else if(goal==="low") filtered=plants.filter(p=>["canopy","shrub"].includes(p.layer));
+  filtered.forEach(p=>{
+    let qty=Math.max(1,Math.floor(polygonArea/(p.width*p.width*6)));
+    currentPlan.push({name:p.name,qty:qty});
+    for(let i=0;i<qty;i++){
+      const randLat=south+Math.random()*(north-south);
+      const randLng=west+Math.random()*(east-west);
+      L.circle([randLat,randLng],{
+        radius:p.width*0.5,
+        color:colors[p.layer],
+        fillOpacity:0.5
+      }).addTo(forestLayer);
+    }
+  });
+  alert("🌳 Forest plan generated on the map!");
+}
+
+async function downloadPDF(){
+  if(currentPlan.length===0){alert("Generate a forest plan first.");return;}
+  const canvas=await html2canvas(document.getElementById("map"));
+  const imgData=canvas.toDataURL("image/png");
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF();
+  doc.setFontSize(18);
+  doc.text("Lancaster Food Forest Plan",15,20);
+  doc.addImage(imgData,"PNG",15,30,180,100);
+  doc.setFontSize(12);
+  let y=140;
+  currentPlan.forEach(p=>{
+    doc.text(`${p.name} — ${p.qty}`,20,y);
+    y+=8;
+  });
+  doc.save("LancasterFoodForestPlan.pdf");
+}
+</script>
+</body>
+</html>
