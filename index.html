@@ -4,218 +4,133 @@
 <meta charset="utf-8"/>
 <title>Lancaster Food Forest Designer</title>
 
-<!-- Google Fonts -->
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600&family=Poppins:wght@600&display=swap" rel="stylesheet">
 
-<!-- Leaflet core, Draw & JS -->
 <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-draw/dist/leaflet.draw.css"/>
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 <script src="https://unpkg.com/leaflet-draw/dist/leaflet.draw.js"></script>
 
-<!-- Helpers -->
 <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <style>
-body {
-  margin:0;
-  font-family:'Open Sans',sans-serif;
-  background:#f4fff4;
-  color:#1d2b1f;
-  display:flex;
-  flex-direction:column;
-  height:100vh;
-}
-header {
-  background:#b9e3b5;
-  padding:15px;
-  text-align:center;
-  font-family:'Poppins',sans-serif;
-  font-weight:600;
-  font-size:26px;
-  box-shadow:0 2px 4px rgba(0,0,0,0.1);
-}
-.controls {
-  background:#e6f4e6;
-  display:flex;
-  flex-wrap:wrap;
-  align-items:center;
-  justify-content:center;
-  gap:10px;
-  padding:10px;
-}
-input, select, button {
-  padding:8px 12px;
-  border-radius:6px;
-  border:1px solid #c2d8c2;
-  font-family:'Open Sans',sans-serif;
-}
-button {
-  background:#4a7c59;
-  color:white;
-  border:none;
-  cursor:pointer;
-  transition:background 0.2s;
-}
-button:hover {
-  background:#64a36e;
-}
-#map {
-  flex:1;
-  position:relative;
-}
-#instructions {
-  position:absolute;
-  bottom:20px;
-  left:20px;
-  background:#ffffffd9;
-  padding:12px;
-  border-radius:6px;
-  max-width:260px;
-  box-shadow:0 2px 10px rgba(0,0,0,0.2);
-  font-size:14px;
-  line-height:1.4;
-  transition:all 0.3s ease;
-  z-index:1000;
-}
-#instructions.hidden {
-  opacity:0;
-  transform:translateY(200px);
-  pointer-events:none;
-}
-#toggleInstructions {
-  position:absolute;
-  bottom:20px;
-  left:20px;
-  background:#4a7c59;
-  color:white;
-  border:none;
-  padding:8px 12px;
-  border-radius:6px;
-  font-family:'Poppins',sans-serif;
-  font-weight:500;
-  cursor:pointer;
-  z-index:1100;
-}
-@media(max-width:768px){
-  header {font-size:22px;}
-  .controls{flex-direction:column;}
-  #instructions{max-width:90%;left:5%;}
-}
+body{margin:0;font-family:'Open Sans',sans-serif;background:#f4fff4;color:#1d2b1f;display:flex;flex-direction:column;height:100vh;}
+header{background:#b9e3b5;padding:15px;text-align:center;font-family:'Poppins',sans-serif;font-weight:600;font-size:26px;box-shadow:0 2px 4px rgba(0,0,0,0.1);}
+.controls{background:#e6f4e6;display:flex;flex-wrap:wrap;align-items:center;justify-content:center;gap:10px;padding:10px;}
+input,select,button{padding:8px 12px;border-radius:6px;border:1px solid #c2d8c2;font-family:'Open Sans',sans-serif;}
+button{background:#4a7c59;color:white;border:none;cursor:pointer;transition:background 0.2s;}
+button:hover{background:#64a36e;}
+#map{flex:1;position:relative;}
+#legend{position:absolute;bottom:25px;right:20px;background:#ffffffd9;border-radius:6px;padding:8px 12px;font-size:13px;box-shadow:0 2px 6px rgba(0,0,0,0.2);line-height:1.4;z-index:1100;}
+#instructions{position:absolute;bottom:20px;left:20px;background:#ffffffd9;padding:12px;border-radius:6px;max-width:260px;box-shadow:0 2px 10px rgba(0,0,0,0.2);font-size:14px;line-height:1.4;transition:all 0.3s ease;z-index:1000;}
+#instructions.hidden{opacity:0;transform:translateY(200px);pointer-events:none;}
+#toggleInstructions{position:absolute;bottom:20px;left:20px;background:#4a7c59;color:white;border:none;padding:8px 12px;border-radius:6px;font-family:'Poppins',sans-serif;font-weight:500;cursor:pointer;z-index:1100;}
+@media(max-width:768px){header{font-size:22px;}.controls{flex-direction:column;}#instructions{max-width:90%;left:5%;}}
 </style>
 </head>
-
 <body>
+
 <header>🌿 Lancaster Food Forest Designer</header>
 
 <div class="controls">
   <input type="text" id="address" placeholder="Enter your address">
   <button id="findBtn">Find Location</button>
+
   <select id="goal">
-    <option value="balanced">Balanced Forest</option>
+    <option value="balanced">Balanced</option>
     <option value="fruit">Fruit-Focused</option>
     <option value="low">Low-Maintenance</option>
   </select>
+
+  <label>Spacing:
+    <select id="spacing">
+      <option value="sparse">Sparse</option>
+      <option value="medium" selected>Medium</option>
+      <option value="dense">Dense</option>
+    </select>
+  </label>
+
+  <label>Exclude Plants:
+    <select id="exclude" multiple size="3">
+      <option value="Hickory">Hickory</option>
+      <option value="Pawpaw">Pawpaw</option>
+      <option value="Black Walnut">Black Walnut</option>
+    </select>
+  </label>
+
   <button onclick="generateForest()">Generate Forest Plan</button>
   <button onclick="downloadPDF()">Download PDF</button>
 </div>
 
 <div id="map">
+  <div id="legend"></div>
   <div id="instructions">
     <strong>🌱 How to Use:</strong><br><br>
-    1️⃣ Enter your address and click <b>Find Location</b><br>
-    2️⃣ Use the polygon ✳️ tool (upper‑left map icons) to draw your planting area<br>
-    3️⃣ Click <b>Generate Forest Plan</b> 🌳 to visualize recommended plants<br>
-    4️⃣ Use <b>Download PDF</b> 📄 to export<br><br>
-    💡 Tip: Zoom in for precise planning!
+    • Enter an address → <b>Find Location</b><br>
+    • Draw your planting area ✳️ (top‑left icons)<br>
+    • Choose goal/spacing and exclude any species<br>
+    • Click <b>Generate Forest Plan</b> 🌳<br>
+    • Drag or click plants to adjust/delete<br>
+    • Export via <b>Download PDF</b> 📄
   </div>
   <button id="toggleInstructions">📘 Help</button>
 </div>
 
 <script>
-// Toggle help box
+// --- HELP ---
 const instructions=document.getElementById("instructions");
 const toggleBtn=document.getElementById("toggleInstructions");
 let helpOpen=true;
 toggleBtn.addEventListener("click",()=>{
   helpOpen=!helpOpen;
-  if(helpOpen){
-    instructions.classList.remove("hidden");
-    toggleBtn.innerText="❌ Close Help";
-  }else{
-    instructions.classList.add("hidden");
-    toggleBtn.innerText="📘 Help";
-  }
+  instructions.classList.toggle("hidden",!helpOpen);
+  toggleBtn.textContent=helpOpen?"❌ Close Help":"📘 Help";
 });
 
-// --- MAP INITIALIZATION with layer toggle (Satellite + Street Map) ---
-const map=L.map('map',{zoomControl:true}).setView([40.0379,-76.3055],18);
-const satellite=L.tileLayer(
-  'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
-  {attribution:'Tiles © Esri | Sources: Esri, USGS, NOAA',maxZoom:22}
-);
-const streets=L.tileLayer(
-  'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  {attribution:'© OpenStreetMap contributors',maxZoom:22}
-);
-satellite.addTo(map);
-L.control.layers(
-  {"🛰️ Satellite":satellite,"🗺️ Street Map":streets},
-  null,
-  {position:"topright"}
-).addTo(map);
+// --- MAP ---
+const map=L.map('map').setView([40.0379,-76.3055],18);
+const satellite=L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+ {attribution:'Tiles © Esri | USGS | NOAA',maxZoom:22}).addTo(map);
+const streets=L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+ {attribution:'© OpenStreetMap contributors',maxZoom:22});
+L.control.layers({"🛰️ Satellite":satellite,"🗺️ Street Map":streets}).addTo(map);
 
-// --- Address search (HTTPS‑safe) ---
+// --- SEARCH ---
 async function geocodeAddress(){
   const addr=document.getElementById("address").value.trim();
-  if(!addr){alert("Please enter an address.");return;}
+  if(!addr)return alert("Enter address");
   const url=`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(addr)}`;
-  try{
-    const res=await fetch(url,{headers:{"Accept-Language":"en"}});
-    const data=await res.json();
-    if(!data.length){alert("Address not found.");return;}
-    const lat=parseFloat(data[0].lat);
-    const lon=parseFloat(data[0].lon);
-    map.setView([lat,lon],20);
-    if(window.addressMarker) map.removeLayer(window.addressMarker);
-    window.addressMarker=L.marker([lat,lon]).addTo(map)
-      .bindPopup(data[0].display_name)
-      .openPopup();
-  }catch(e){
-    console.error(e);
-    alert("Lookup failed. Please try again later.");
-  }
+  const res=await fetch(url,{headers:{"Accept-Language":"en"}});
+  const data=await res.json();
+  if(!data.length)return alert("Not found");
+  const lat=+data[0].lat,lon=+data[0].lon;
+  map.setView([lat,lon],20);
+  if(window.addressMarker)map.removeLayer(window.addressMarker);
+  window.addressMarker=L.marker([lat,lon]).addTo(map).bindPopup(data[0].display_name).openPopup();
 }
-document.getElementById("findBtn").addEventListener("click",geocodeAddress);
+document.getElementById("findBtn").onclick=geocodeAddress;
 
-// --- Drawing tools ---
-const drawnItems=new L.FeatureGroup();
-map.addLayer(drawnItems);
-map.addControl(new L.Control.Draw({
-  edit:{featureGroup:drawnItems},
-  draw:{polygon:true,rectangle:false,polyline:false,circle:false,marker:false}
-}));
+// --- DRAW ---
+const drawnItems=new L.FeatureGroup();map.addLayer(drawnItems);
+map.addControl(new L.Control.Draw({edit:{featureGroup:drawnItems},draw:{polygon:true,rectangle:false,polyline:false,circle:false,marker:false}}));
 
-let plantingPolygon=null;
-let polygonArea=0;
-let forestLayer=L.layerGroup().addTo(map);
-let currentPlan=[];
-
-map.on(L.Draw.Event.CREATED,function(e){
+let plantingPolygon=null,polygonArea=0,forestLayer=L.layerGroup().addTo(map),currentPlan=[];
+map.on(L.Draw.Event.CREATED,e=>{
   drawnItems.clearLayers();
-  plantingPolygon=e.layer;
-  drawnItems.addLayer(plantingPolygon);
+  plantingPolygon=e.layer;drawnItems.addLayer(plantingPolygon);
   const geojson=plantingPolygon.toGeoJSON();
-  polygonArea=turf.area(geojson)*10.7639; // m²→ft²
-  alert("Area selected: "+Math.round(polygonArea)+" sq ft");
+  polygonArea=turf.area(geojson)*10.7639;
+  alert("Area: "+Math.round(polygonArea)+" sq ft");
 });
 
-// --- Plant data ---
-const plants=[
+// --- PLANTS & COLORS ---
+const basePlants=[
 {name:"Pecan",width:40,layer:"canopy"},
-{name:"Persimmon",width:20,layer:"canopy"},
+{name:"Hickory",width:40,layer:"canopy"},
+{name:"Black Walnut",width:60,layer:"canopy"},
+{name:"Persimmon",width:25,layer:"canopy"},
 {name:"Pawpaw",width:15,layer:"understory"},
 {name:"Hazelnut",width:10,layer:"shrub"},
 {name:"Elderberry",width:10,layer:"shrub"},
@@ -224,69 +139,90 @@ const plants=[
 {name:"Blackberry",width:3,layer:"berry"},
 {name:"Comfrey",width:3,layer:"herb"}
 ];
+const colors={canopy:"#206a3b",understory:"#3b8e2e",shrub:"#5dc273",berry:"#97e8a4",herb:"#ebd46a"};
 
-// --- Generate forest plan ---
+// --- LEGEND ---
+const legendDiv=document.getElementById("legend");
+function updateLegend(){
+  legendDiv.innerHTML="<b>Legend</b><br>";
+  for(const l in colors)
+    legendDiv.innerHTML+=`<span style="display:inline-block;width:12px;height:12px;background:${colors[l]};margin-right:4px;border-radius:50%;"></span>${l}<br>`;
+}
+
+// --- FOREST GENERATOR ---
 function generateForest(){
-  if(!plantingPolygon){alert("Draw your planting area first.");return;}
+  if(!plantingPolygon)return alert("Draw area first");
   forestLayer.clearLayers();currentPlan=[];
   const goal=document.getElementById("goal").value;
-  const b=plantingPolygon.getBounds();
-  const north=b.getNorth(),south=b.getSouth(),west=b.getWest(),east=b.getEast();
-  const colors={canopy:"#206a3b",understory:"#379956",shrub:"#5dc273",berry:"#97e8a4",herb:"#e5d768"};
-  let filtered=plants;
-  if(goal==="fruit")filtered=plants.filter(p=>["berry","shrub","understory"].includes(p.layer));
-  else if(goal==="low")filtered=plants.filter(p=>["canopy","shrub"].includes(p.layer));
-  filtered.forEach(p=>{
-    const qty=Math.max(1,Math.floor(polygonArea/(p.width*p.width*6)));
+  const spacing=document.getElementById("spacing").value;
+  const excludes=Array.from(document.getElementById("exclude").selectedOptions).map(o=>o.value);
+  const bounds=plantingPolygon.getBounds();
+  const north=bounds.getNorth(),south=bounds.getSouth(),west=bounds.getWest(),east=bounds.getEast();
+
+  let plants=basePlants.filter(p=>!excludes.includes(p.name));
+  if(goal==="fruit")plants=plants.filter(p=>["berry","shrub","understory"].includes(p.layer));
+  else if(goal==="low")plants=plants.filter(p=>["canopy","shrub"].includes(p.layer));
+
+  let spacingFactor=8;
+  if(spacing==="dense")spacingFactor=4;
+  else if(spacing==="sparse")spacingFactor=12;
+
+  plants.forEach(p=>{
+    const adjArea=p.width*p.width*spacingFactor;
+    const qty=Math.max(1,Math.floor(polygonArea/adjArea));
     currentPlan.push({name:p.name,qty});
     for(let i=0;i<qty;i++){
       const randLat=south+Math.random()*(north-south);
       const randLng=west+Math.random()*(east-west);
-      L.circle([randLat,randLng],{
-        radius:p.width*0.5,color:colors[p.layer],fillOpacity:0.5
+
+      // Create draggable circle marker
+      const plant=L.circle([randLat,randLng],{
+        radius:p.width*0.4,color:colors[p.layer],fillColor:colors[p.layer],
+        fillOpacity:0.5,weight:1
       }).addTo(forestLayer);
+
+      const popupHtml=`<b>${p.name}</b><br>Layer: ${p.layer}<br>
+        <button onclick="deletePlant(${randLat},${randLng})">🗑️ Remove</button>`;
+
+      plant.bindPopup(popupHtml);
+      plant.dragging = new L.Handler.Drag(plant); // pseudo-drag support via marker update
+      plant.on('mousedown',()=>plant.dragging.enable());
+      plant.on('mouseup',()=>plant.dragging.disable());
     }
   });
-  alert("🌳 Forest plan generated! See the layout on the map.");
+  updateLegend();
+  alert("🌳 Plan generated! Click circles to remove; drag to adjust.");
 }
 
-// --- Improved PDF export ---
-async function downloadPDF(){
-  if(currentPlan.length===0){alert("Generate a forest plan first.");return;}
-  const mapElement=document.getElementById("map");
-  const canvas=await html2canvas(mapElement,{scale:1});
-  const mapImg=canvas.toDataURL("image/png");
-
-  const {jsPDF}=window.jspdf;
-  const doc=new jsPDF("p","mm","a4");
-
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(18);
-  doc.text("Lancaster Food Forest Plan",15,20);
-
-  const today=new Date().toLocaleDateString();
-  doc.setFontSize(10);
-  doc.text(`Generated on ${today}`,15,27);
-
-  doc.addImage(mapImg,"PNG",15,32,180,100);
-
-  let y=140;
-  doc.setFont("helvetica","bold");
-  doc.setFontSize(12);
-  doc.text("Plant Type",20,y);
-  doc.text("Quantity",100,y);
-  y+=6;
-  doc.line(20,y,190,y);
-  y+=6;
-  doc.setFont("helvetica","normal");
-  currentPlan.forEach(p=>{
-    doc.text(p.name,20,y);
-    doc.text(String(p.qty),100,y);
-    y+=7;
-    if(y>270){doc.addPage();y=20;}
+// --- PLANT DELETION FUNCTION ---
+function deletePlant(lat,lon){
+  forestLayer.eachLayer(layer=>{
+    if(layer.getLatLng){
+      const ll=layer.getLatLng();
+      if(Math.abs(ll.lat-lat)<0.00001 && Math.abs(ll.lng-lon)<0.00001)
+        forestLayer.removeLayer(layer);
+    }else if(layer.getBounds){ // circles use _latlng property
+      const c=layer._latlng;
+      if(c && Math.abs(c.lat-lat)<0.00001 && Math.abs(c.lng-lon)<0.00001)
+        forestLayer.removeLayer(layer);
+    }
   });
-  doc.setFontSize(9);
-  doc.text("Designed with the Lancaster Food Forest Designer tool",20,290);
+}
+
+// --- PDF EXPORT ---
+async function downloadPDF(){
+  if(currentPlan.length===0)return alert("Generate forest first");
+  const canvas=await html2canvas(document.getElementById("map"),{scale:1});
+  const img=canvas.toDataURL("image/png");
+  const {jsPDF}=window.jspdf;const doc=new jsPDF("p","mm","a4");
+  doc.setFont("helvetica","bold");doc.setFontSize(18);
+  doc.text("Lancaster Food Forest Plan",15,20);
+  doc.setFontSize(10);doc.text(`Generated ${new Date().toLocaleDateString()}`,15,27);
+  doc.addImage(img,"PNG",15,32,180,95);
+  doc.setFont("helvetica","bold");doc.setFontSize(12);
+  let y=140;doc.text("Plant Type",20,y);doc.text("Qty",100,y);y+=6;doc.line(20,y,190,y);y+=6;
+  doc.setFont("helvetica","normal");
+  currentPlan.forEach(p=>{doc.text(p.name,20,y);doc.text(String(p.qty),100,y);y+=7;if(y>270){doc.addPage();y=20;}});
   doc.save("LancasterFoodForestPlan.pdf");
 }
 </script>
